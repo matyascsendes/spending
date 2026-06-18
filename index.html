@@ -268,8 +268,9 @@ function initKPIs() {
   const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
   const daysPassed = today.getDate();
   const timePct = daysPassed / daysInMonth;
-  const budgetSoFar = bdgt * timePct;
-  const actualMo = CATS.reduce((s,c) => s + (DATA[cur]?.[c.id]||0), 0);
+  const bdgtExcl = CATS.filter(c=>c.id!=='2 - BNB'&&c.id!=='20 - ONE OFF').reduce((s,c)=>s+(BUDGET[c.id]||0),0);
+  const budgetSoFar = bdgtExcl * timePct;
+  const actualMo = CATS.filter(c=>c.id!=='2 - BNB'&&c.id!=='20 - ONE OFF').reduce((s,c) => s + (DATA[cur]?.[c.id]||0), 0);
   const diff = actualMo - budgetSoFar;
   const moEl = document.getElementById('kpi-mo-vs-budget');
   moEl.textContent = (diff >= 0 ? '+' : '') + '€' + Math.round(Math.abs(diff)).toLocaleString();
