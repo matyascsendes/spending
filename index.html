@@ -128,7 +128,7 @@ thead th.cur-month{color:#4ade80!important}
     <div class="kpi">
       <div class="kpi-label">Avg cost / month</div>
       <div class="kpi-value" id="kpi-avg-excl-bnb">—</div>
-      <div class="kpi-sub">excl. BNB · Sep 25 – today</div>
+      <div class="kpi-sub">excl. BNB & one-off · Sep 25 – today</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Monthly budget</div>
@@ -253,9 +253,9 @@ function initKPIs() {
   const cur = curMonth();
   const prevMs = months().filter(m => m !== cur);
 
-  // 1. Avg cost/month excl BNB (excl current month)
+  // 1. Avg cost/month excl BNB + ONE OFF (excl current month)
   const avgExclBnb = prevMs.length
-    ? prevMs.reduce((s,m) => s + CATS.filter(c=>c.id!=='2 - BNB').reduce((ss,c)=>(ss+(DATA[m]?.[c.id]||0)),0), 0) / prevMs.length
+    ? prevMs.reduce((s,m) => s + CATS.filter(c=>c.id!=='2 - BNB'&&c.id!=='20 - ONE OFF').reduce((ss,c)=>(ss+(DATA[m]?.[c.id]||0)),0), 0) / prevMs.length
     : 0;
   document.getElementById('kpi-avg-excl-bnb').textContent = '€' + Math.round(avgExclBnb).toLocaleString();
 
