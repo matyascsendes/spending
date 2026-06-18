@@ -78,7 +78,16 @@ thead th.cur-month{color:#4ade80!important}
 .sidenav-icon{width:15px;height:15px;flex-shrink:0}
 .legend{display:flex;gap:16px;font-family:'DM Mono',monospace;font-size:10px;color:#555;margin-bottom:14px;flex-wrap:wrap;align-items:center}
 .leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
-@media(max-width:768px){body{margin-left:0}.sidenav{display:none}.content{padding:20px}.two-col{grid-template-columns:1fr}header{padding:20px 20px}}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:28px}
+.kpi{background:#161614;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:20px 22px}
+.kpi-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;color:#555;text-transform:uppercase;margin-bottom:10px}
+.kpi-value{font-size:24px;font-weight:700;color:#fff;line-height:1}
+.kpi-value.green{color:#4ade80}
+.kpi-value.red{color:#f87171}
+.kpi-value.amber{color:#fbbf24}
+.kpi-sub{font-family:'DM Mono',monospace;font-size:11px;color:#444;margin-top:6px}
+@media(max-width:768px){body{margin-left:0}.sidenav{display:none}.content{padding:20px}.kpi-grid{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}header{padding:20px 20px}}
 </style>
 </head>
 <body>
@@ -113,6 +122,30 @@ thead th.cur-month{color:#4ade80!important}
 </header>
 
 <div class="content">
+
+  <!-- KPI row -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Avg cost / month</div>
+      <div class="kpi-value" id="kpi-avg-excl-bnb">—</div>
+      <div class="kpi-sub">excl. BNB · Sep 25 – today</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Monthly budget</div>
+      <div class="kpi-value" id="kpi-budget-total">—</div>
+      <div class="kpi-sub">sum of all budgets</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">This month vs budget</div>
+      <div class="kpi-value" id="kpi-mo-vs-budget">—</div>
+      <div class="kpi-sub" id="kpi-mo-vs-budget-sub">time-adjusted</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg % vs budget</div>
+      <div class="kpi-value" id="kpi-avg-pct">—</div>
+      <div class="kpi-sub">avg across budgeted cats</div>
+    </div>
+  </div>
 
   <!-- Budget table -->
   <div class="chart-card" style="padding:0;overflow:hidden">
@@ -213,6 +246,47 @@ function catAvg(catId, excludeCurrent=true) {
 }
 function budgetTotal() {
   return CATS.reduce((s,c) => s + (BUDGET[c.id] || 0), 0);
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────────────
+function initKPIs() {
+  const cur = curMonth();
+  const prevMs = months().filter(m => m !== cur);
+
+  // 1. Avg cost/month excl BNB (excl current month)
+  const avgExclBnb = prevMs.length
+    ? prevMs.reduce((s,m) => s + CATS.filter(c=>c.id!=='2 - BNB').reduce((ss,c)=>(ss+(DATA[m]?.[c.id]||0)),0), 0) / prevMs.length
+    : 0;
+  document.getElementById('kpi-avg-excl-bnb').textContent = '€' + Math.round(avgExclBnb).toLocaleString();
+
+  // 2. Monthly budget total
+  const bdgt = budgetTotal();
+  document.getElementById('kpi-budget-total').textContent = '€' + Math.round(bdgt).toLocaleString();
+
+  // 3. This month vs time-adjusted budget
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+  const daysPassed = today.getDate();
+  const timePct = daysPassed / daysInMonth;
+  const budgetSoFar = bdgt * timePct;
+  const actualMo = CATS.reduce((s,c) => s + (DATA[cur]?.[c.id]||0), 0);
+  const diff = actualMo - budgetSoFar;
+  const moEl = document.getElementById('kpi-mo-vs-budget');
+  moEl.textContent = (diff >= 0 ? '+' : '') + '€' + Math.round(Math.abs(diff)).toLocaleString();
+  moEl.className = 'kpi-value ' + (diff <= 0 ? 'green' : 'red');
+  document.getElementById('kpi-mo-vs-budget-sub').textContent =
+    '€' + Math.round(actualMo).toLocaleString() + ' actual · ' + Math.round(timePct*100) + '% of month';
+
+  // 4. Avg % vs budget (budgeted cats only, excl current month)
+  const budgetedCats = CATS.filter(c => (BUDGET[c.id]||0) > 0);
+  const pcts = budgetedCats.map(c => {
+    const avg = prevMs.length ? prevMs.reduce((s,m)=>s+(DATA[m]?.[c.id]||0),0)/prevMs.length : 0;
+    return avg / BUDGET[c.id] * 100;
+  }).filter(p => isFinite(p));
+  const avgPct = pcts.length ? pcts.reduce((a,b)=>a+b,0)/pcts.length : 0;
+  const pctEl = document.getElementById('kpi-avg-pct');
+  pctEl.textContent = Math.round(avgPct) + '%';
+  pctEl.className = 'kpi-value ' + (avgPct <= 100 ? 'green' : avgPct <= 120 ? 'amber' : 'red');
 }
 
 // ── TABLE ─────────────────────────────────────────────────────────────────
@@ -373,6 +447,7 @@ function buildCatCharts() {
 }
 
 function rebuild() {
+  initKPIs();
   buildTable();
   buildCatCharts();
 }
@@ -426,6 +501,7 @@ async function fetchAndCacheGitHubData() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
+initKPIs();
 buildTable();
 buildCatCharts();
 loadGitHubData();
