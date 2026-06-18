@@ -299,7 +299,7 @@ function buildTable() {
   // Header
   let htr = '<tr><th>Category</th>';
   ms.forEach(m => {
-    const label = MO_LABELS[m] || m;
+    const label = (MO_LABELS[m] || m) + ` '` + m.slice(2,4);
     htr += `<th class="${m===cur?'cur-month':''}">${label}</th>`;
   });
   htr += '<th class="col-budget">Budget</th><th class="col-avg">AVG</th><th>DIFF</th></tr>';
