@@ -230,7 +230,7 @@ let DATA = JSON.parse(JSON.stringify(MONTHLY_RAW)); // mutable, replaced by API 
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 const fmt = v => v === 0 ? '—' : '€' + Math.round(v).toLocaleString();
-const months = () => Object.keys(DATA).sort();
+const months = () => Object.keys(DATA).filter(m => m >= "2025-09").sort();
 const curMonth = () => {
   const now = new Date();
   return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
