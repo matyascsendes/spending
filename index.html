@@ -279,7 +279,7 @@ function initKPIs() {
     '€' + Math.round(actualMo).toLocaleString() + ' actual · ' + Math.round(timePct*100) + '% of month';
 
   // 4. Avg % vs budget (budgeted cats only, excl current month)
-  const budgetedCats = CATS.filter(c => (BUDGET[c.id]||0) > 0);
+  const budgetedCats = CATS.filter(c => (BUDGET[c.id]||0) > 0 && c.id!=='2 - BNB' && c.id!=='20 - ONE OFF');
   const pcts = budgetedCats.map(c => {
     const avg = prevMs.length ? prevMs.reduce((s,m)=>s+(DATA[m]?.[c.id]||0),0)/prevMs.length : 0;
     return avg / BUDGET[c.id] * 100;
