@@ -88,6 +88,20 @@ thead th.cur-month{color:#4ade80!important}
 .kpi-value.amber{color:#fbbf24}
 .kpi-sub{font-family:'DM Mono',monospace;font-size:11px;color:#444;margin-top:6px}
 @media(max-width:768px){body{margin-left:0}.sidenav{display:none}.content{padding:20px}.kpi-grid{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}header{padding:20px 20px}}
+
+/* Tabs */
+.tabs-bar{display:flex;gap:2px;padding:0 40px;border-bottom:1px solid rgba(255,255,255,0.06);background:#0e0e0c}
+.tab-btn{background:none;border:none;padding:12px 18px;font-family:'Syne',sans-serif;font-size:13px;font-weight:500;color:rgba(255,255,255,0.35);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s}
+.tab-btn:hover{color:rgba(255,255,255,0.65)}
+.tab-btn.active{color:#fff;border-bottom-color:#4ade80}
+.tab-section{display:none}
+.tab-section.active{display:block}
+.mo-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:24px}
+.mo-pill{background:#1a1a18;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:5px 10px;font-family:'DM Mono',monospace;font-size:11px;color:#555;cursor:pointer;transition:all .15s}
+.mo-pill:hover{border-color:rgba(255,255,255,0.2);color:#aaa}
+.mo-pill.active{background:rgba(74,222,128,0.1);border-color:rgba(74,222,128,0.3);color:#4ade80}
+#donutChart{max-height:340px!important}
+#budgetBarChart{max-height:420px!important}
 </style>
 </head>
 <body>
@@ -109,6 +123,12 @@ thead th.cur-month{color:#4ade80!important}
   </div>
 </header>
 
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="showSpendTab('overview',this)">Overview</button>
+  <button class="tab-btn" onclick="showSpendTab('monthly',this)">Havi bontás</button>
+</div>
+
+<div id="tab-overview" class="tab-section active">
 <div class="content">
 
   <!-- KPI row -->
@@ -178,6 +198,45 @@ thead th.cur-month{color:#4ade80!important}
   </div>
 
 </div><!-- /content -->
+</div><!-- /tab-overview -->
+
+<div id="tab-monthly" class="tab-section">
+<div class="content">
+  <div class="mo-pills" id="mo-pills"></div>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Spent this month</div>
+      <div class="kpi-value" id="mo-spent">—</div>
+      <div class="kpi-sub">excl. BNB &amp; one-off</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Monthly budget</div>
+      <div class="kpi-value" id="mo-budget">—</div>
+      <div class="kpi-sub">excl. BNB &amp; one-off</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Remaining</div>
+      <div class="kpi-value" id="mo-remaining">—</div>
+      <div class="kpi-sub" id="mo-remaining-sub"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Pace</div>
+      <div class="kpi-value" id="mo-pace">—</div>
+      <div class="kpi-sub" id="mo-pace-sub"></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Mire megy a pénz</div><div class="chart-sub">Kategória szerinti bontás &middot; excl. BNB &amp; one-off</div></div></div>
+      <canvas id="donutChart"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div><div class="chart-title">Budget vs Tényleges</div><div class="chart-sub">Kategóriánként &middot; zöld = alatta, sárga = közel, piros = túl</div></div></div>
+      <canvas id="budgetBarChart"></canvas>
+    </div>
+  </div>
+</div>
+</div><!-- /tab-monthly -->
 
 <script>
 // ── DATA ──────────────────────────────────────────────────────────────────
@@ -439,6 +498,7 @@ function rebuild() {
   initKPIs();
   buildTable();
   buildCatCharts();
+  if (document.getElementById('tab-monthly').classList.contains('active')) renderMonthlyTab();
 }
 
 // ── GITHUB DATA LOADER (with localStorage cache) ──────────────────────────
@@ -487,6 +547,135 @@ async function fetchAndCacheGitHubData() {
     const st = document.getElementById('api-status');
     if (st) { st.textContent = 'offline'; st.className = 'api-status err'; }
   }
+}
+
+// ── MONTHLY TAB ───────────────────────────────────────────────────────────
+let moTabMonth = curMonth();
+let donutInst = null, budgetBarInst = null;
+const EXCL_SET = new Set(['2 - BNB', '20 - ONE OFF']);
+
+function showSpendTab(tab, btn) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab === 'monthly') renderMonthlyTab();
+}
+
+function selectMonth(m) {
+  moTabMonth = m;
+  document.querySelectorAll('.mo-pill').forEach(p => p.classList.toggle('active', p.dataset.m === m));
+  renderMonthlyTab();
+}
+
+function buildMonthPills() {
+  const ms = months();
+  document.getElementById('mo-pills').innerHTML = ms.map(m => {
+    const label = (MO_LABELS[m] || m) + ' \'' + m.slice(2,4);
+    return `<button class="mo-pill${m===moTabMonth?' active':''}" data-m="${m}" onclick="selectMonth('${m}')">${label}</button>`;
+  }).join('');
+}
+
+function renderMonthlyTab() {
+  const cats = CATS.filter(c => !EXCL_SET.has(c.id));
+  const m = moTabMonth;
+  const spent = cats.reduce((s,c) => s + (DATA[m]?.[c.id] || 0), 0);
+  const budgetExcl = cats.reduce((s,c) => s + (BUDGET[c.id] || 0), 0);
+  const remaining = budgetExcl - spent;
+
+  document.getElementById('mo-spent').textContent = '€' + Math.round(spent).toLocaleString();
+  document.getElementById('mo-budget').textContent = '€' + Math.round(budgetExcl).toLocaleString();
+  const remEl = document.getElementById('mo-remaining');
+  remEl.textContent = (remaining >= 0 ? '+' : '-') + '€' + Math.round(Math.abs(remaining)).toLocaleString();
+  remEl.className = 'kpi-value ' + (remaining >= 0 ? 'green' : 'red');
+
+  const now = new Date();
+  const isCurrentMonth = m === curMonth();
+  const paceEl = document.getElementById('mo-pace');
+  const paceSubEl = document.getElementById('mo-pace-sub');
+  if (isCurrentMonth) {
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const timePct = now.getDate() / daysInMonth;
+    const expected = budgetExcl * timePct;
+    const pace = expected > 0 ? Math.round(spent / expected * 100) : 0;
+    paceEl.textContent = pace + '%';
+    paceEl.className = 'kpi-value ' + (pace <= 100 ? 'green' : pace <= 120 ? 'amber' : 'red');
+    paceSubEl.textContent = 'of time-adjusted (' + Math.round(timePct*100) + '% of month)';
+  } else {
+    const pct = budgetExcl > 0 ? Math.round(spent / budgetExcl * 100) : 0;
+    paceEl.textContent = pct + '%';
+    paceEl.className = 'kpi-value ' + (pct <= 100 ? 'green' : pct <= 120 ? 'amber' : 'red');
+    paceSubEl.textContent = 'of monthly budget';
+  }
+
+  buildMonthPills();
+  renderDonutChart(m, cats);
+  renderBudgetBarChart(m, cats);
+}
+
+function renderDonutChart(m, cats) {
+  const active = cats.filter(c => (DATA[m]?.[c.id] || 0) > 0);
+  const vals = active.map(c => DATA[m][c.id]);
+  const labels = active.map(c => c.short);
+  const colors = active.map(c => CAT_COLORS[c.id] || 'rgba(150,150,150,0.6)');
+  if (donutInst) { donutInst.destroy(); donutInst = null; }
+  donutInst = new Chart(document.getElementById('donutChart').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderWidth: 1, borderColor: '#161614', hoverOffset: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '58%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            color: '#888', font: { family: 'DM Mono', size: 10 }, padding: 10, boxWidth: 10,
+            generateLabels: chart => chart.data.labels.map((label, i) => ({
+              text: label + '  €' + Math.round(chart.data.datasets[0].data[i]).toLocaleString(),
+              fillStyle: chart.data.datasets[0].backgroundColor[i],
+              strokeStyle: chart.data.datasets[0].backgroundColor[i],
+              index: i
+            }))
+          }
+        },
+        tooltip: { callbacks: { label: c => c.label + ': €' + Math.round(c.parsed).toLocaleString() } }
+      }
+    }
+  });
+}
+
+function renderBudgetBarChart(m, cats) {
+  const active = cats.filter(c => (BUDGET[c.id] || 0) > 0 || (DATA[m]?.[c.id] || 0) > 0);
+  const labels = active.map(c => c.short);
+  const actuals = active.map(c => DATA[m]?.[c.id] || 0);
+  const budgets = active.map(c => BUDGET[c.id] || 0);
+  const barColors = actuals.map((a,i) => {
+    const b = budgets[i];
+    if (b === 0) return 'rgba(150,150,150,0.5)';
+    const r = a / b;
+    return r > 1.1 ? 'rgba(248,113,113,0.75)' : r > 0.8 ? 'rgba(251,191,36,0.75)' : 'rgba(74,222,128,0.65)';
+  });
+  if (budgetBarInst) { budgetBarInst.destroy(); budgetBarInst = null; }
+  budgetBarInst = new Chart(document.getElementById('budgetBarChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Actual', data: actuals, backgroundColor: barColors, borderRadius: 3, borderWidth: 0, order: 1 },
+        { label: 'Budget', data: budgets, backgroundColor: 'rgba(0,0,0,0)', borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderRadius: 3, order: 2 }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#555', font: { family: 'DM Mono', size: 10 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': €' + Math.round(c.parsed.x).toLocaleString() } }
+      },
+      scales: {
+        x: { ticks: { color: '#5e5d59', font: { size: 10 }, callback: v => '€' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } },
+        y: { ticks: { color: '#aaa', font: { size: 11 } }, grid: { display: false }, border: { display: false } }
+      }
+    }
+  });
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
