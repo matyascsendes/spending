@@ -125,7 +125,7 @@ thead th.cur-month{color:#4ade80!important}
 
 <div class="tabs-bar">
   <button class="tab-btn active" onclick="showSpendTab('overview',this)">Overview</button>
-  <button class="tab-btn" onclick="showSpendTab('monthly',this)">Havi bontás</button>
+  <button class="tab-btn" onclick="showSpendTab('monthly',this)">Monthly</button>
 </div>
 
 <div id="tab-overview" class="tab-section active">
@@ -227,11 +227,11 @@ thead th.cur-month{color:#4ade80!important}
   </div>
   <div class="two-col">
     <div class="chart-card">
-      <div class="chart-header"><div><div class="chart-title">Mire megy a pénz</div><div class="chart-sub">Kategória szerinti bontás &middot; excl. BNB &amp; one-off</div></div></div>
+      <div class="chart-header"><div><div class="chart-title">Where the money goes</div><div class="chart-sub">Category breakdown &middot; excl. BNB &amp; one-off</div></div></div>
       <canvas id="donutChart"></canvas>
     </div>
     <div class="chart-card">
-      <div class="chart-header"><div><div class="chart-title">Budget vs Tényleges</div><div class="chart-sub">Kategóriánként &middot; zöld = alatta, sárga = közel, piros = túl</div></div></div>
+      <div class="chart-header"><div><div class="chart-title">Budget vs Actual</div><div class="chart-sub">Sorted by budget &middot; green = under, amber = near, red = over</div></div></div>
       <canvas id="budgetBarChart"></canvas>
     </div>
   </div>
@@ -644,15 +644,17 @@ function renderDonutChart(m, cats) {
 }
 
 function renderBudgetBarChart(m, cats) {
-  const active = cats.filter(c => (BUDGET[c.id] || 0) > 0 || (DATA[m]?.[c.id] || 0) > 0);
+  const active = cats
+    .filter(c => (BUDGET[c.id] || 0) > 0 || (DATA[m]?.[c.id] || 0) > 0)
+    .sort((a, b) => (BUDGET[b.id] || 0) - (BUDGET[a.id] || 0));
   const labels = active.map(c => c.short);
   const actuals = active.map(c => DATA[m]?.[c.id] || 0);
   const budgets = active.map(c => BUDGET[c.id] || 0);
-  const barColors = actuals.map((a,i) => {
+  const barColors = actuals.map((a, i) => {
     const b = budgets[i];
-    if (b === 0) return 'rgba(150,150,150,0.5)';
+    if (b === 0) return 'rgba(150,150,150,0.6)';
     const r = a / b;
-    return r > 1.1 ? 'rgba(248,113,113,0.75)' : r > 0.8 ? 'rgba(251,191,36,0.75)' : 'rgba(74,222,128,0.65)';
+    return r > 1.1 ? 'rgba(248,113,113,0.85)' : r > 0.8 ? 'rgba(251,191,36,0.85)' : 'rgba(74,222,128,0.8)';
   });
   if (budgetBarInst) { budgetBarInst.destroy(); budgetBarInst = null; }
   budgetBarInst = new Chart(document.getElementById('budgetBarChart').getContext('2d'), {
@@ -660,15 +662,24 @@ function renderBudgetBarChart(m, cats) {
     data: {
       labels,
       datasets: [
-        { label: 'Actual', data: actuals, backgroundColor: barColors, borderRadius: 3, borderWidth: 0, order: 1 },
-        { label: 'Budget', data: budgets, backgroundColor: 'rgba(0,0,0,0)', borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderRadius: 3, order: 2 }
+        { label: 'Budget', data: budgets, backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderRadius: 4, barPercentage: 0.75, categoryPercentage: 0.85, order: 2 },
+        { label: 'Actual', data: actuals, backgroundColor: barColors, borderWidth: 0, borderRadius: 4, barPercentage: 0.45, categoryPercentage: 0.85, order: 1 }
       ]
     },
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { labels: { color: '#555', font: { family: 'DM Mono', size: 10 }, boxWidth: 10 } },
-        tooltip: { callbacks: { label: c => c.dataset.label + ': €' + Math.round(c.parsed.x).toLocaleString() } }
+        legend: { labels: { color: '#555', font: { family: 'DM Mono', size: 10 }, boxWidth: 10, padding: 16 } },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              if (c.datasetIndex === 0) return 'Budget: €' + Math.round(c.parsed.x).toLocaleString();
+              const b = budgets[c.dataIndex];
+              const pct = b > 0 ? ' (' + Math.round(c.parsed.x / b * 100) + '%)' : '';
+              return 'Actual: €' + Math.round(c.parsed.x).toLocaleString() + pct;
+            }
+          }
+        }
       },
       scales: {
         x: { ticks: { color: '#5e5d59', font: { size: 10 }, callback: v => '€' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } },
